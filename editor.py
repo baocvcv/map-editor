@@ -159,9 +159,9 @@ class MapEditor(wx.Frame):
         wrap2 =  wx.BoxSizer(wx.HORIZONTAL)
         wrap3 =  wx.BoxSizer(wx.HORIZONTAL)
         wrap2.Add(btn[0], proportion = 1)
-        wrap2.Add(btn[1], proportion = 1)
+        wrap2.Add(btn[3], proportion = 1)
+        wrap3.Add(btn[1], proportion = 1)
         wrap3.Add(btn[2], proportion = 1)
-        wrap3.Add(btn[3], proportion = 1)
         buttonBox.Add(wrap2)
         buttonBox.Add(wrap3, flag=wx.BOTTOM, border=10)
         for i in range(4):
@@ -315,8 +315,13 @@ class MapEditor(wx.Frame):
     def MapMove(self, event):
         if not self.mapData:
             return
-        dirList = {'Up':[0,-1],'Left':[-1,0],'Right':[1,0],'Down':[0,1]}
         dir = event.GetEventObject().GetLabel()
+        self.Move(dir, 10)
+        
+    def Move(self, dir, distance):
+        if not self.mapData:
+            return
+        dirList = {'Up':[0,-1],'Left':[-1,0],'Right':[1,0],'Down':[0,1]}
         newX = self.currentPos[0]
         newY = self.currentPos[1]
         for i in range(5):
@@ -388,15 +393,24 @@ class MapDrawing(wx.Frame):
         size = self.ClientSize
         self._Buffer = wx.Bitmap(*size)
 
+        self.keyStats = {}
+        self.keyStats[wx.WXK_LEFT] = False
+        self.keyStats[wx.WXK_RIGHT] = False
+        self.keyStats[wx.WXK_DOWN] = False
+        self.keyStats[wx.WXK_UP] = False
+
+        self.timer = wx.Timer(self)
+    
         self.LButtonDown = False
 
-        #TODO: Mouse event (left click & drag) to change the tiles
-        #TODO: Mouse event (right click) to highlight tile
         self.Bind(wx.EVT_PAINT, self.OnPaint)
-
         self.Bind(wx.EVT_LEFT_DOWN, self.OnLButtonDown)
         self.Bind(wx.EVT_LEFT_UP, self.OnLButtonUp)
         self.Bind(wx.EVT_RIGHT_DOWN, self.OnRButtonDown)
+
+        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self.Bind(wx.EVT_KEY_UP, self.OnKeyUp)
+        self.Bind(wx.EVT_TIMER, self.OnTimer, self.timer)
         
     def render(self, what):
         d = self.parent.tileSize
@@ -435,6 +449,9 @@ class MapDrawing(wx.Frame):
         if not self.parent.isFileOpen:
             return
         self.LButtonDown = True
+        nx = int(event.GetPosition()[0] / self.parent.tileSize + self.parent.currentPos[0])
+        ny = int(event.GetPosition()[1] / self.parent.tileSize + self.parent.currentPos[1])
+        self.brushIt(nx, ny)
         self.Bind(wx.EVT_MOTION, self.OnMouseMove)
 
     def OnLButtonUp(self, event):
@@ -446,6 +463,9 @@ class MapDrawing(wx.Frame):
     def OnMouseMove(self, event):
         nx = int(event.GetPosition()[0] / self.parent.tileSize + self.parent.currentPos[0])
         ny = int(event.GetPosition()[1] / self.parent.tileSize + self.parent.currentPos[1])
+        self.brushIt(nx, ny)
+
+    def brushIt(self, nx, ny):
         if nx < 0 or nx >= self.parent.mapWidth or ny < 0 or ny >= self.parent.mapHeight:
             pass
         else:
@@ -462,6 +482,33 @@ class MapDrawing(wx.Frame):
             self.parent.selectedBox[0] = nx
             self.parent.selectedBox[1] = ny
             self.render(2)
+
+    def OnKeyDown(self, event):
+        if event.GetKeyCode() not in self.keyStats.keys():
+            return
+        self.keyStats[event.GetKeyCode()] = True
+        self.doMove()
+        self.timer.Start(100)
+
+    def OnKeyUp(self, event):
+        if event.GetKeyCode() not in self.keyStats.keys():
+            return
+        self.keyStats[event.GetKeyCode()] = False
+        self.timer.Stop()
+        
+    def OnTimer(self, event):
+        self.doMove()
+    
+    def doMove(self):
+        if self.keyStats[wx.WXK_LEFT]:
+            self.parent.Move('Left', 1)
+        if self.keyStats[wx.WXK_RIGHT]:
+            self.parent.Move('Right', 1)
+        if self.keyStats[wx.WXK_DOWN]:
+            self.parent.Move('Down', 1)
+        if self.keyStats[wx.WXK_UP]:
+            self.parent.Move('Up', 1)
+
 
 if __name__ == '__main__':
     # When this module is run (not imported) then create the app, the
